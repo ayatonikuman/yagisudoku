@@ -456,10 +456,10 @@ function ensure3d(){
   const cv=$("c3d"),r=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true});
   r.setPixelRatio(Math.min(devicePixelRatio||1,2));r.shadowMap.enabled=true;r.shadowMap.type=THREE.PCFSoftShadowMap;
   const sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(32,1,.1,200);
-  sc.add(new THREE.HemisphereLight(0xffffff,0x77776f,.8));
-  const sun=new THREE.DirectionalLight(0xffffff,.75);sun.position.set(-5,10,6);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);
-  Object.assign(sun.shadow.camera,{left:-7,right:7,top:7,bottom:-7});sun.shadow.bias=-.0008;sc.add(sun);
-  Object.assign(T3,{r,sc,cam,phi:.03,goalPhi:.9,theta:-.55,last:performance.now()});
+  sc.add(new THREE.HemisphereLight(0xffffff,0x6f7069,.58));
+  const sun=new THREE.DirectionalLight(0xfffdf7,1.0);sun.position.set(-5.5,11,6.5);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
+  sun.shadow.bias=-.0002;sun.shadow.normalBias=.035;sc.add(sun);
+  Object.assign(T3,{r,sc,cam,sun,phi:.03,goalPhi:.9,theta:-.55,last:performance.now()});
   let d=null;
   cv.addEventListener("pointerdown",e=>{d={x:e.clientX,y:e.clientY,th:T3.theta,ph:T3.goalPhi};cv.setPointerCapture(e.pointerId);cv.style.cursor="grabbing"});
   cv.addEventListener("pointermove",e=>{if(!d)return;T3.theta=d.th-(e.clientX-d.x)*.008;T3.goalPhi=Math.min(1.3,Math.max(.3,d.ph-(e.clientY-d.y)*.005));if(!T3.anim)T3.phi=T3.goalPhi});
@@ -467,14 +467,15 @@ function ensure3d(){
   requestAnimationFrame(loop3d);return true;
 }
 function textTex(txt,color,under){
-  const c=document.createElement("canvas");c.width=c.height=128;const g=c.getContext("2d");
-  g.fillStyle=color;g.font="600 64px 'IBM Plex Mono',ui-monospace,monospace";g.textAlign="center";g.textBaseline="middle";g.fillText(txt,64,66);
-  if(under)g.fillRect(40,100,48,5);const t=new THREE.CanvasTexture(c);t.anisotropy=4;return t;
+  const c=document.createElement("canvas");c.width=c.height=256;const g=c.getContext("2d");
+  g.fillStyle=color;g.font="600 128px 'IBM Plex Mono',ui-monospace,monospace";g.textAlign="center";g.textBaseline="middle";g.fillText(txt,128,132);
+  if(under)g.fillRect(80,200,96,10);const t=new THREE.CanvasTexture(c);t.anisotropy=8;return t;
 }
 function clear3d(){if(T3.group){T3.sc.remove(T3.group);T3.group.traverse(o=>{o.geometry&&o.geometry.dispose();if(o.material){(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{m.map&&m.map.dispose();m.dispose()})}})}
   T3.group=null;T3.goats=[];T3.fx=[]}
-function makeGoat(){
-  const g=new THREE.Group(),W=new THREE.MeshStandardMaterial({color:0xf8f7f2,roughness:.85}),D=new THREE.MeshStandardMaterial({color:0x34352f,roughness:.6}),
+function makeGoat(k=0){
+  const coat=[0xf8f7f2,0xd9d7cf,0xb3b1a8][k%3],horn=[.75,.62,.88][k%3],size=[1.3,1.22,1.37][k%3];
+  const g=new THREE.Group(),W=new THREE.MeshStandardMaterial({color:coat,roughness:.85}),D=new THREE.MeshStandardMaterial({color:0x34352f,roughness:.6}),
     K=new THREE.MeshStandardMaterial({color:0xd9b3a3,roughness:.8});
   const box=(w,h,d,m,x,y,z)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);g.add(o);return o};
   box(.34,.19,.2,W,0,.25,0);                                           // 胴
@@ -483,12 +484,12 @@ function makeGoat(){
   const hb=(w,h,d,m,x,y,z)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);head.add(o);return o};
   hb(.15,.14,.13,W,.02,.03,0);hb(.08,.075,.1,K,.1,-.01,0);              // 頭と鼻先
   for(const s of [1,-1]){
-    const horn=new THREE.Mesh(new THREE.CylinderGeometry(.012,.026,.15,8),D);horn.position.set(-.02,.13,.04*s);horn.rotation.z=.75;head.add(horn);
+    const hn=new THREE.Mesh(new THREE.CylinderGeometry(.012,.026,.15,8),D);hn.position.set(-.02,.13,.04*s);hn.rotation.z=horn;head.add(hn);
     const ear=hb(.08,.025,.045,W,-.02,.05,.09*s);ear.rotation.x=.5*s;
     const eye=new THREE.Mesh(new THREE.SphereGeometry(.015,8,8),D);eye.position.set(.08,.06,.05*s);head.add(eye)}
   const beard=new THREE.Mesh(new THREE.ConeGeometry(.024,.07,8),W);beard.position.set(.07,-.08,0);beard.rotation.z=Math.PI;head.add(beard);
   const tail=box(.05,.07,.03,W,-.19,.32,0);tail.rotation.z=-.6;
-  g.traverse(o=>{if(o.isMesh)o.castShadow=true});g.scale.setScalar(1.15);g.userData.head=head;
+  g.traverse(o=>{if(o.isMesh)o.castShadow=true});g.scale.setScalar(size);g.userData.head=head;g.userData.size=size;
   return g;
 }
 function makeFlag(ghost){
@@ -502,8 +503,13 @@ function makeFlag(ghost){
 function routePts(p){const out=[],hOf=i=>H3(val[i])+.03;let [x,z]=cellXZ(p[0]);out.push(new THREE.Vector3(x,hOf(p[0]),z));
   for(let k=0;k+1<p.length;k++){const u=p[k],v=p[k+1],[ux,uz]=cellXZ(u),[vx,vz]=cellXZ(v),ex=(ux+vx)/2,ez=(uz+vz)/2;
     out.push(new THREE.Vector3(ex,hOf(u),ez),new THREE.Vector3(ex,hOf(v),ez),new THREE.Vector3(vx,hOf(v),vz))}return out}
+// 影用カメラは盤をちょうど包む大きさに。updateProjectionMatrix を呼ばないと既定の枠のままで、端が欠けて影が崩れる
+function fitShadow(){
+  const c=T3.sun.shadow.camera,r=N*.75+2.2;
+  c.left=-r;c.right=r;c.top=r;c.bottom=-r;c.near=1;c.far=34;c.updateProjectionMatrix();
+}
 function build3d(){
-  clear3d();const g=new THREE.Group();T3.group=g;T3.sc.add(g);
+  clear3d();fitShadow();const g=new THREE.Group();T3.group=g;T3.sc.add(g);
   const lo=new THREE.Color(cssv("--lo")),hi=new THREE.Color(cssv("--hi")),fr=new THREE.Color(cssv("--frame")),ent=cssv("--entry");
   const base=new THREE.Mesh(new THREE.BoxGeometry(N+.5,.16,N+.5),new THREE.MeshStandardMaterial({color:fr,roughness:.95}));base.position.y=-.08;base.receiveShadow=true;g.add(base);
   T3.cols=[];
@@ -516,7 +522,7 @@ function build3d(){
   const mat=new THREE.LineDashedMaterial({color:new THREE.Color(cssv("--route")),dashSize:.05,gapSize:.08});
   T3.lines=hintLvl<1?[]:rivers.map(p=>{const ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints(routePts(p)),mat);ln.computeLineDistances();g.add(ln);return{ln,p}});
   T3.flags=rivers.map(p=>{const f=makeFlag(true),e=p[p.length-1],[x,z]=cellXZ(e);f.position.set(x+.28,0,z-.28);f.userData.cell=e;g.add(f);return f});
-  T3.goats=rivers.map(p=>{const go=makeGoat(),[x,z]=cellXZ(p[0]);go.position.set(x,0,z);g.add(go);
+  T3.goats=rivers.map((p,k)=>{const go=makeGoat(k),[x,z]=cellXZ(p[0]);go.position.set(x,0,z);g.add(go);
     if(p.length>1){const [nx,nz]=cellXZ(p[1]);go.rotation.y=Math.atan2(-(nz-z),nx-x)}return{g:go,cell:p[0]}});
 }
 function show3d(on,{climb=false}={}){
@@ -548,7 +554,7 @@ function loop3d(now){
     T3.cols.forEach(c=>{const kk=a.dur?Math.min(1,Math.max(0,(a.t-c.delay)/(a.dur*.75))):1;c.cur=.08+(c.h-.08)*ease(kk)});
     if(k>=1&&T3.cols.every(c=>Math.abs(c.cur-c.h)<1e-3)){T3.anim=null;T3.phi=T3.goalPhi;if(a.climb)startClimb()}}
   else T3.phi+=(T3.goalPhi-T3.phi)*.2;
-  T3.cols.forEach((c,i)=>{c.m.scale.y=c.cur;c.m.position.y=c.cur/2;if(c.cap)c.cap.position.y=c.cur-.02;if(c.lab)c.lab.position.y=c.cur+.004});
+  T3.cols.forEach((c,i)=>{c.m.scale.y=c.cur;c.m.position.y=c.cur/2;if(c.cap)c.cap.position.y=c.cur-.031;if(c.lab)c.lab.position.y=c.cur+(c.cap?.014:.005)});
   T3.lines&&T3.lines.forEach(({ln,p})=>{if(T3.anim){const pts=routePts(p);ln.geometry.setFromPoints(pts);ln.computeLineDistances()}});
   T3.flags&&T3.flags.forEach(f=>{f.position.y=topY(f.userData.cell);if(f.userData.cloth)f.userData.cloth.rotation.y=Math.sin(now/300+f.position.x)*.25;
     if(f.userData.grow!=null&&f.userData.grow<1){f.userData.grow=Math.min(1,f.userData.grow+dt*2.5);f.scale.y=ease(f.userData.grow)}});
@@ -563,17 +569,18 @@ function loop3d(now){
       const u=path[C.k],v=path[C.k+1],[ux,uz]=cellXZ(u),[vx,vz]=cellXZ(v),yu=topY(u),yv=topY(v),dur=reduceMotion?.01:.45;
       go.rotation.y=Math.atan2(-(vz-uz),vx-ux);C.t+=dt;const q=Math.min(1,C.t/dur);
       go.position.set(ux+(vx-ux)*q,yu+(yv-yu)*q+Math.sin(Math.PI*q)*(.22+Math.max(0,yv-yu)),uz+(vz-uz)*q);
-      go.scale.set(1.15,1.15*(q<.12?1-.25*Math.sin(q/.12*Math.PI):1),1.15);
-      if(q>=1){C.k++;C.t=0;C.phase=C.k+1<path.length?"rest":"end";go.scale.setScalar(1.15)}
+      const sz=go.userData.size;go.scale.set(sz,sz*(q<.12?1-.25*Math.sin(q/.12*Math.PI):1),sz);
+      if(q>=1){C.k++;C.t=0;C.phase=C.k+1<path.length?"rest":"end";go.scale.setScalar(sz)}
       allDone=false;return}
-    if(C.phase==="rest"){C.t+=dt;go.scale.y=1.15*(1-.12*Math.sin(Math.min(1,C.t/.16)*Math.PI));if(C.t>.16){C.t=0;C.phase="hop"}allDone=false;return}
+    if(C.phase==="rest"){C.t+=dt;go.scale.y=go.userData.size*(1-.12*Math.sin(Math.min(1,C.t/.16)*Math.PI));if(C.t>.16){C.t=0;C.phase="hop"}allDone=false;return}
     if(C.phase==="end"){C.phase="done";C.t=0;
       if(C.r.good){const f=T3.flags[k];f.material;const nf=makeFlag(false);const [x,z]=cellXZ(f.userData.cell);nf.position.set(x+.28,topY(f.userData.cell),z-.28);
         nf.userData.cell=f.userData.cell;nf.userData.grow=0;nf.scale.y=.01;T3.group.add(nf);T3.flags.push(nf);f.visible=false}
       else question(go)}
     if(C.phase==="done"){C.t+=dt;const [x,z]=cellXZ(path[path.length-1]),y=topY(path[path.length-1]);
-      const cp=T3.cam.position;let dy=Math.atan2(-(cp.z-z),cp.x-x)-go.rotation.y;   // 着いたらこちらを向く
-      go.rotation.y+=Math.atan2(Math.sin(dy),Math.cos(dy))*Math.min(1,dt*6);
+      if(C.face==null){const cp=T3.cam.position;C.face=Math.atan2(-(cp.z-z),cp.x-x)}   // 着いた時点の手前向きで固定
+      const dy=Math.atan2(Math.sin(C.face-go.rotation.y),Math.cos(C.face-go.rotation.y));
+      go.rotation.y+=dy*Math.min(1,dt*6);
       if(C.r.good){const j=(C.t%1.1)/1.1;go.position.set(x,y+(j<.35?Math.sin(j/.35*Math.PI)*.18:0),z)}
       else{go.position.set(x,y,z);go.userData.head.rotation.y=Math.sin(C.t*7)*.45*Math.max(0,1-C.t/2.5)}
       if(C.t<.6)allDone=false}
