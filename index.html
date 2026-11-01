@@ -64,9 +64,6 @@ svg.rv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;over
 .tick{fill:none;stroke:var(--route);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 /* ヤギと旗の札：左上に固定して下地を敷く。濃い岩の上でも、数字を入れても埋もれない */
 .mk .plate{fill:var(--badge);stroke:var(--line);stroke-width:1}
-.mk.flag .plate{stroke:var(--flag);stroke-width:1.6}
-.num{font:700 9px var(--mono);fill:var(--fg)}
-.lab rect{fill:var(--badge);stroke:var(--line);stroke-width:.8}
 .goat .face{fill:var(--badge);stroke:var(--fg);stroke-width:1.6}
 .goat .horn{fill:none;stroke:var(--fg);stroke-width:2;stroke-linecap:round}
 .goat .eye{fill:var(--fg)}
@@ -88,13 +85,11 @@ svg.rv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;over
 #c3d{position:absolute;inset:0;width:100%;height:100%;z-index:1;touch-action:none;cursor:grab;display:block}
 .bar{flex:none;background:var(--chrome);border-top:1px solid var(--line);color:var(--muted);font-size:12px;line-height:1.5;padding:6px 14px;text-align:center}
 .bar b{color:var(--fg);font-weight:500}
-.veil{position:absolute;inset:0;background:var(--table);display:grid;place-items:center;z-index:4;text-align:center}
-.veil p{margin:0 0 12px;font-size:15px;font-weight:700;letter-spacing:.12em}
-.veil small{display:block;color:var(--muted);font-weight:400;letter-spacing:0;margin-top:4px;font-size:12px}
-.clear{position:absolute;inset:0;display:grid;place-items:end center;padding-bottom:12px;pointer-events:none;z-index:3}
+#fx{position:absolute;inset:0;width:100%;height:100%;z-index:3;pointer-events:none}
+.clear{position:absolute;inset:0;display:grid;place-items:end center;padding-bottom:12px;pointer-events:none;z-index:4}
 .ccard{pointer-events:auto;background:var(--chrome);border:1px solid var(--line);border-radius:14px;padding:14px 20px;text-align:center;box-shadow:0 12px 32px var(--shadow);
   animation:pop .55s cubic-bezier(.2,1.6,.4,1) both;max-width:min(420px,calc(100vw - 28px))}
-.cbig{font-size:24px;font-weight:700;letter-spacing:.1em;line-height:1.2}
+.cbig{font-size:26px;font-weight:700;letter-spacing:.12em;line-height:1.2;color:var(--flag)}
 .ct{font:500 13px var(--mono);color:var(--muted);margin-top:4px;font-variant-numeric:tabular-nums}
 .ct .why{font:400 12px/1.65 var(--ui);color:var(--fg);text-align:left;margin-top:6px}
 .cbtn{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px}
@@ -118,7 +113,6 @@ svg.rv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;over
   .top{padding:6px 10px;gap:4px 8px}
   .stat{gap:10px;font-size:10px}
   .stat b{font-size:13px}
-  .stat .wide{display:none}
   .desk{padding:6px 8px;gap:6px}
   .bar{font-size:11.5px;padding:5px 10px}
   .cbig{font-size:21px}
@@ -134,7 +128,8 @@ svg.rv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;over
 @media (orientation:landscape){
   .desk{flex-direction:row;justify-content:center;gap:14px;padding:10px 14px}
   .side{width:auto;max-width:min(40%,250px)}
-  .pad,.tools{max-width:228px}
+  .pad{max-width:228px}
+  .tools{max-width:172px}
 }
 </style>
 </head>
@@ -147,7 +142,8 @@ svg.rv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;over
       <button class="chip" data-n="4" aria-pressed="false">4×4</button>
       <button class="chip" data-n="5" aria-pressed="true">5×5</button>
     </div>
-    <div class="stat"><span class="wide">埋めた<b id="filled">0/0</b></span><span>登らせた<b id="tries">0</b></span><span class="wide">ヒント<b id="hints">0/2</b></span><span>時間<b id="time">0:00</b></span></div>
+    <div class="stat"><span>時間<b id="time">0:00</b></span></div>
+    <button class="chip" id="rulesBtn">ルール</button>
   </div>
   <div class="desk" id="desk">
     <div class="bwrap" id="bwrap">
@@ -156,18 +152,16 @@ svg.rv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;over
     <div class="side">
       <div class="pad" id="pad"></div>
       <div class="tools">
-        <button class="chip" id="hintBtn">ヒント</button>
+        <button class="chip" id="hintBtn" aria-pressed="false">ヒント</button>
         <button class="chip" id="view3d" aria-pressed="false">立体で見る</button>
-        <button class="chip" id="pause">一時停止</button>
         <button class="chip" id="retry">最初から</button>
         <button class="chip" id="newq">新しい問題</button>
-        <button class="chip" id="rulesBtn">ルール</button>
       </div>
     </div>
     <canvas id="c3d" hidden aria-label="岩山の立体表示。ドラッグで回転"></canvas>
-    <div class="veil" id="veil" hidden><div><p>一時停止中<small>時間は止まっています　Esc か P でも再開</small></p><button class="chip on" id="resume">再開する</button></div></div>
+    <canvas id="fx" hidden aria-hidden="true"></canvas>
     <div class="clear" id="clear" hidden><div class="ccard"><div class="cbig" id="cbig">登りきった！</div><div class="ct" id="ct"></div>
-      <div class="cbtn" id="ok-btns"><button class="chip" id="c-replay">もう一度見る</button><button class="chip" id="c-retry">同じ問題をもう一度</button><button class="chip on" id="c-new">次の問題</button></div>
+      <div class="cbtn" id="ok-btns"><button class="chip" id="c-replay">もう一度見る</button><button class="chip on" id="c-new">次の問題</button></div>
       <div class="cbtn" id="ng-btns" hidden><button class="chip" id="n-replay">もう一度見る</button><button class="chip on" id="n-fix">上から見て直す</button></div></div></div>
   </div>
   <div class="bar" id="bar"></div>
@@ -177,12 +171,14 @@ svg.rv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;over
   <div class="paper" role="dialog" aria-modal="true" aria-label="ルールとキー操作">
     <h2>ルール</h2>
     <ul>
-      <li>各行・各列に高さ <b id="ruleK">1〜5</b> をひとつずつ。</li>
-      <li>ヤギは上下左右で<b>一番高い岩</b>へ跳ぶ。</li>
-      <li>それより高い岩がなければ、そこが頂上。</li>
-      <li>一番高い隣が同じ高さで2つあると、迷って止まる。</li>
-      <li>ヤギ全員が<b>別々の旗</b>に着けば成功。</li>
+      <li>ナンプレと同じで、<b>各行・各列に <span id="ruleK">1〜5</span> をひとつずつ</b>。同じ行・同じ列に同じ数字は置けない（ブロックの区切りはない）。</li>
+      <li>数字は<b>岩の高さ</b>。大きいほど高く、盤では濃く見える。</li>
+      <li>ヤギは上下左右のうち<b>一番高い岩</b>へ跳び移る。</li>
+      <li>跳び移れる高い岩が隣になければ、そこが頂上でヤギは止まる。</li>
+      <li>一番高い隣が<b>同じ高さで2つ</b>あると、ヤギは迷って止まる（失敗）。</li>
+      <li>ヤギ全員が<b>別々の旗</b>に着けば成功。どのヤギがどの旗かは決まっていない。</li>
       <li>下線の数字は、最初から決まっている高さ。</li>
+      <li>行き詰まったら「ヒント」で、ヤギが通る道（足あと）を出せる。</li>
     </ul>
     <div class="kb">
       <h2>キー操作</h2>
@@ -192,8 +188,7 @@ svg.rv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;over
         <dt>Shift+数字 / M</dt><dd>候補メモ</dd>
         <dt>0 / Backspace</dt><dd>消す</dd>
         <dt>Enter</dt><dd>登らせる</dd>
-        <dt>Esc / P</dt><dd>一時停止</dd>
-        <dt>?</dt><dd>この紙を開く</dd>
+        <dt>?</dt><dd>この紙を開く（Esc で閉じる）</dd>
       </dl>
     </div>
     <div class="x"><button class="chip on" id="sheetClose">閉じる</button></div>
@@ -211,7 +206,7 @@ svg.rv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;over
 const $=id=>document.getElementById(id),grid=$("grid");
 const reduceMotion=matchMedia("(prefers-reduced-motion: reduce)").matches;
 let MODE="flag",hintLvl=0,N=5,sol=[],givens=new Set(),rivers=[],val=[],memo=[],sel=0,memoMode=false,stepCons=[],MK=new Set();
-let tries=0,lastMiss=new Set(),t0=0,tEnd=0,solved=false,paused=false,pausedAt=0,peers=[],units=[],nbr=[],SIM=null;
+let tries=0,lastMiss=new Set(),t0=0,tEnd=0,solved=false,hintSeen=false,peers=[],units=[],nbr=[],SIM=null;
 try{const n=+localStorage.getItem("yagi-n");if(n===4||n===5)N=n}catch(e){}
 
 /* 生成は「谷へ下る道」で作り、高さを上下反転して「頂上へ登る道」にする */
@@ -363,16 +358,15 @@ function build(){
   let h="",cl="";
   for(let i=0;i<N*N;i++){const pos=`left:${(i%N)*CS}px;top:${Math.floor(i/N)*CS}px`;h+=`<div class="tile" data-t="${i}" style="${pos}"></div>`;cl+=`<div class="cell" data-i="${i}" style="${pos}"></div>`}
   let s=`<svg class="rv" viewBox="0 0 ${N*CS} ${N*CS}" aria-hidden="true">`;
-  if(hintLvl>=2)stepCons.forEach(st=>{const [x1,y1]=ctr(st.u),[x2,y2]=ctr(st.v);s+=`<line class="route" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+  if(hintLvl>=1)stepCons.forEach(st=>{const [x1,y1]=ctr(st.u),[x2,y2]=ctr(st.v);s+=`<line class="route" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
     const mx=(x1+x2)/2,my=(y1+y2)/2,ang=Math.atan2(y2-y1,x2-x1)*180/Math.PI,a=CS*.07;
     s+=`<path class="tick" d="M${-a} ${-a} L${a*.4} 0 L${-a} ${a}" transform="translate(${mx} ${my}) rotate(${ang})"/>`});
   // ヤギと旗はマスの左上に札で固める。真ん中は入力した数字のために空けておき、番号は左下へ
-  const B=CS*.38,mk=(i,kind,icon,k)=>{
+  const B=CS*.38,mk=(i,kind,icon)=>{
     const c=i%N,r=Math.floor(i/N),x=c*CS+CS*.05+B/2,y=r*CS+CS*.05+B/2;
-    const lab=hintLvl>=1?`<g class="lab"><rect x="${c*CS+CS*.06}" y="${r*CS+CS*.73}" width="${CS*.23}" height="${CS*.21}" rx="${CS*.06}"/><text class="num" text-anchor="middle" x="${c*CS+CS*.175}" y="${r*CS+CS*.895}" font-size="${CS*.17}">${k+1}</text></g>`:"";
-    return `<g class="mk ${kind}"><rect class="plate" x="${x-B/2}" y="${y-B/2}" width="${B}" height="${B}" rx="${B*.28}"/>${icon(x,y)}</g>${lab}`};
-  rivers.forEach((p,k)=>{s+=mk(p[p.length-1],"flag",(x,y)=>flagSvg(x-B*.07,y,B/30),k)});
-  rivers.forEach((p,k)=>{s+=mk(p[0],"goat",(x,y)=>goatSvg(x,y+B*.04,B/35),k)});
+    return `<g class="mk ${kind}"><rect class="plate" x="${x-B/2}" y="${y-B/2}" width="${B}" height="${B}" rx="${B*.28}"/>${icon(x,y)}</g>`};
+  rivers.forEach(p=>{s+=mk(p[p.length-1],"flag",(x,y)=>flagSvg(x-B*.07,y,B/30))});
+  rivers.forEach(p=>{s+=mk(p[0],"goat",(x,y)=>goatSvg(x,y+B*.04,B/35))});
   s+=`</svg>`;
   grid.innerHTML=h+s+cl;
   grid.querySelectorAll(".cell").forEach(el=>el.onpointerdown=e=>{e.preventDefault();sel=+el.dataset.i;grid.focus();paint()});
@@ -393,11 +387,11 @@ function paint(){
     tl.style.setProperty("--h",v?Math.round((v-1)/(N-1)*100)+"%":"0%");
     if(v)el.textContent=v;else if(memo[i]){const cols=N===4?2:3;let m=`<div class="memo" style="grid-template-columns:repeat(${cols},1fr)">`;
       for(let k=1;k<=N;k++)m+=`<span>${memo[i]&(1<<k)?k:""}</span>`;el.innerHTML=m+"</div>"}else el.textContent=""});
-  const gb=$("goBtn");if(gb)gb.disabled=solved||val.some(x=>!x);
+  const gb=$("goBtn");if(gb){const left=val.filter(x=>!x).length;gb.disabled=solved||left>0;gb.textContent=left?`あと ${left}`:"登らせる"}
   hud();
 }
 function input(v){
-  if(solved||paused||T3.on||givens.has(sel))return;if(!t0)t0=performance.now();
+  if(solved||T3.on||givens.has(sel))return;if(!t0)t0=performance.now();
   if(v===0){val[sel]=0;memo[sel]=0}
   else if(memoMode&&!val[sel])memo[sel]^=1<<v;
   else{val[sel]=val[sel]===v?0:v;if(val[sel])for(const p of peers[sel])memo[p]&=~(1<<v)}
@@ -426,15 +420,15 @@ function climbTry(){
   if(SIM.ok){solved=true;tEnd=performance.now()}
   hud();if(!replay())showResult();
 }
-function replay(){if(!SIM||!show3d(true,{climb:true}))return false;$("clear").hidden=true;return true}
+function replay(){stopFx();if(!SIM||!show3d(true,{climb:true}))return false;$("clear").hidden=true;return true}
 function showResult(){
   const sim=SIM;$("ok-btns").hidden=!sim.ok;$("ng-btns").hidden=sim.ok;
   if(sim.ok){
-    const t=tEnd-t0,k="yagi2-best-"+N;let best=null;try{best=JSON.parse(localStorage.getItem(k))}catch(e){}
-    const nb=!best||hintLvl<best.h||(hintLvl===best.h&&(tries<best.tries||(tries===best.tries&&t<best.t)));if(nb)try{localStorage.setItem(k,JSON.stringify({t,tries,h:hintLvl}))}catch(e){}
-    $("cbig").textContent=tries===1&&!hintLvl?"一発で登りきった！":"登りきった！";
-    $("ct").textContent=`${tries} 回目で成功　ヒント${hintLvl}　${fmt(t)}`+(nb&&best?"　自己ベスト更新":best?`　ベスト ヒント${best.h}・${best.tries}回・${fmt(best.t)}`:"");
-    $("bar").innerHTML=`<b>完成　${tries} 回目　${fmt(t)}</b>`;
+    const t=tEnd-t0;
+    $("cbig").textContent="登頂成功！";
+    $("ct").textContent=(tries===1&&!hintSeen?"一発　":"")+fmt(t);
+    $("bar").innerHTML=`<b>登頂成功　${fmt(t)}</b>`;
+    confetti();
   }else{
     $("cbig").textContent="ちがう岩に着いた";
     const why=[];sim.res.forEach((r,k)=>{if(r.good)return;const last=r.path[r.path.length-1];
@@ -520,7 +514,7 @@ function build3d(){
       lab.rotation.x=-Math.PI/2;lab.position.set(x-.24,0,z+.24);lab.scale.setScalar(.75);g.add(lab)}
     T3.cols.push({m,lab,cap,h:H3(v),cur:H3(0),delay:(Math.floor(i/N)+i%N)*.04})}
   const mat=new THREE.LineDashedMaterial({color:new THREE.Color(cssv("--route")),dashSize:.05,gapSize:.08});
-  T3.lines=hintLvl<2?[]:rivers.map(p=>{const ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints(routePts(p)),mat);ln.computeLineDistances();g.add(ln);return{ln,p}});
+  T3.lines=hintLvl<1?[]:rivers.map(p=>{const ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints(routePts(p)),mat);ln.computeLineDistances();g.add(ln);return{ln,p}});
   T3.flags=rivers.map(p=>{const f=makeFlag(true),e=p[p.length-1],[x,z]=cellXZ(e);f.position.set(x+.28,0,z-.28);f.userData.cell=e;g.add(f);return f});
   T3.goats=rivers.map(p=>{const go=makeGoat(),[x,z]=cellXZ(p[0]);go.position.set(x,0,z);g.add(go);
     if(p.length>1){const [nx,nz]=cellXZ(p[1]);go.rotation.y=Math.atan2(-(nz-z),nx-x)}return{g:go,cell:p[0]}});
@@ -578,6 +572,8 @@ function loop3d(now){
         nf.userData.cell=f.userData.cell;nf.userData.grow=0;nf.scale.y=.01;T3.group.add(nf);T3.flags.push(nf);f.visible=false}
       else question(go)}
     if(C.phase==="done"){C.t+=dt;const [x,z]=cellXZ(path[path.length-1]),y=topY(path[path.length-1]);
+      const cp=T3.cam.position;let dy=Math.atan2(-(cp.z-z),cp.x-x)-go.rotation.y;   // 着いたらこちらを向く
+      go.rotation.y+=Math.atan2(Math.sin(dy),Math.cos(dy))*Math.min(1,dt*6);
       if(C.r.good){const j=(C.t%1.1)/1.1;go.position.set(x,y+(j<.35?Math.sin(j/.35*Math.PI)*.18:0),z)}
       else{go.position.set(x,y,z);go.userData.head.rotation.y=Math.sin(C.t*7)*.45*Math.max(0,1-C.t/2.5)}
       if(C.t<.6)allDone=false}
@@ -591,28 +587,66 @@ function loop3d(now){
   T3.cam.lookAt(0,cy,0);T3.r.render(T3.sc,T3.cam);
 }
 
+/* ---------- 紙吹雪 ---------- */
+const FX={on:false,p:[],t:0,last:0};
+function confetti(){
+  const cv=$("fx");if(!cv||reduceMotion)return;
+  cv.hidden=false;   // 先に出してから測る（隠れたままだと幅がゼロ）
+  const W=cv.clientWidth,H=cv.clientHeight,dpr=Math.min(devicePixelRatio||1,2);
+  cv.width=W*dpr;cv.height=H*dpr;
+  const cols=[cssv("--flag"),cssv("--flag"),cssv("--fg"),cssv("--hi"),cssv("--frame")];
+  FX.p=[];
+  for(let i=0;i<140;i++)FX.p.push({x:Math.random()*W,y:-20-Math.random()*H*.6,
+    vx:(Math.random()-.5)*70,vy:70+Math.random()*150,a:Math.random()*6.28,va:(Math.random()-.5)*9,
+    w:4+Math.random()*6,h:7+Math.random()*9,c:cols[i%cols.length]});
+  FX.on=true;FX.t=0;FX.last=performance.now();requestAnimationFrame(fxLoop);
+}
+function fxLoop(now){
+  if(!FX.on)return;
+  const cv=$("fx"),g=cv.getContext("2d"),W=cv.clientWidth,H=cv.clientHeight,dpr=cv.width/W;
+  const dt=Math.min(.05,(now-FX.last)/1000);FX.last=now;FX.t+=dt;
+  g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,W,H);
+  let alive=0;
+  for(const p of FX.p){
+    p.vy+=170*dt;p.vx*=.995;p.x+=p.vx*dt;p.y+=p.vy*dt;p.a+=p.va*dt;
+    if(p.y<H+24){alive++;
+      g.save();g.translate(p.x,p.y);g.rotate(p.a);g.globalAlpha=Math.max(0,Math.min(1,(5-FX.t)/1.2));
+      g.fillStyle=p.c;g.fillRect(-p.w/2,-p.h/2,p.w,p.h*Math.abs(Math.cos(p.a*1.6))+1);g.restore()}
+  }
+  if(alive&&FX.t<5)requestAnimationFrame(fxLoop);else stopFx();
+}
+function stopFx(){FX.on=false;const cv=$("fx");if(cv&&!cv.hidden){cv.getContext("2d").clearRect(0,0,cv.width,cv.height);cv.hidden=true}}
+
 /* ---------- 進行 ---------- */
 function fmt(ms){const s=Math.floor(ms/1000);return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")}
-function hud(){$("tries").textContent=tries;$("hints").textContent=hintLvl+"/2";$("filled").textContent=`${val.filter(Boolean).length}/${N*N}`;$("time").textContent=fmt(tEnd?tEnd-t0:t0?(paused?pausedAt:performance.now())-t0:0)}
-function intro(){$("bar").innerHTML=`各行・各列に高さ 1〜${N} をひとつずつ。ヤギは<b>一番高い隣</b>へ跳び、それぞれ<b>別の旗</b>に着けば成功。`}
-function resetState(){if(T3.on)show3d(false);hintLvl=0;$("hintBtn").textContent="ヒント";$("hintBtn").disabled=false;tries=0;lastMiss=new Set();SIM=null;t0=0;tEnd=0;solved=false;paused=false;$("veil").hidden=true;$("clear").hidden=true;$("pause").textContent="一時停止";intro();hud()}
+function hud(){$("time").textContent=fmt(tEnd?tEnd-t0:t0?performance.now()-t0:0)}
+function intro(){$("bar").innerHTML=`ヤギは上下左右で<b>一番高いマス</b>へ跳ぶ。それぞれ<b>別の旗</b>にたどり着けば成功！`}
+function syncHint(){$("hintBtn").setAttribute("aria-pressed",hintLvl>0)}
+function resetState(){if(T3.on)show3d(false);stopFx();lastMiss=new Set();SIM=null;tEnd=0;solved=false;$("clear").hidden=true;syncHint();intro();hud()}
 function newGame(){
   setup();$("bar").textContent="岩山を作っています…";
-  setTimeout(()=>{let g;if(MODE==="flag"){g=generateFlag();sol=g.h;rivers=g.rs;stepCons=rivers.flatMap(p=>p.slice(0,-1).map((u,k)=>({u,v:p[k+1]})))}else{g=generate();sol=g.h.map(x=>N+1-x);rivers=g.rs;stepCons=g.steps}givens=g.g;
-    val=[...Array(N*N)].map((_,i)=>givens.has(i)?sol[i]:0);memo=Array(N*N).fill(0);sel=0;layout();resetState()},20);
+  setTimeout(()=>{const g=generateFlag();sol=g.h;rivers=g.rs;stepCons=rivers.flatMap(p=>p.slice(0,-1).map((u,k)=>({u,v:p[k+1]})));givens=g.g;
+    val=[...Array(N*N)].map((_,i)=>givens.has(i)?sol[i]:0);memo=Array(N*N).fill(0);sel=0;hintLvl=0;hintSeen=false;tries=0;t0=0;layout();resetState();paint()},20);
 }
-function retry(){val=[...Array(N*N)].map((_,i)=>givens.has(i)?sol[i]:0);memo=Array(N*N).fill(0);resetState();paint()}
-function setPause(v){if(solved||v===paused||!sol.length)return;
-  if(v){paused=true;pausedAt=performance.now();$("veil").hidden=false;$("pause").textContent="再開"}
-  else{if(t0)t0+=performance.now()-pausedAt;paused=false;$("veil").hidden=true;$("pause").textContent="一時停止"}hud()}
+function retry(){val=[...Array(N*N)].map((_,i)=>givens.has(i)?sol[i]:0);memo=Array(N*N).fill(0);sel=0;tries=0;t0=0;resetState();paint()}
+
+/* 盤の大きさを切り替えても、それぞれの問題を覚えておく */
+const STASH={};
+const elapsed=()=>tEnd?tEnd-t0:t0?performance.now()-t0:0;
+function stash(){if(sol.length)STASH[N]={sol,rivers,stepCons,givens,val,memo,sel,hintLvl,hintSeen,tries,solved,lastMiss,SIM,el:elapsed()}}
+function unstash(s){
+  sol=s.sol;rivers=s.rivers;stepCons=s.stepCons;givens=s.givens;val=s.val;memo=s.memo;sel=s.sel;
+  hintLvl=s.hintLvl;hintSeen=s.hintSeen;tries=s.tries;solved=s.solved;lastMiss=s.lastMiss;SIM=s.SIM;
+  if(T3.on)show3d(false);stopFx();
+  setup();t0=s.el?performance.now()-s.el:0;tEnd=solved?performance.now():0;
+  layout();$("clear").hidden=true;syncHint();intro();hud();paint();
+}
 function move(dr,dc){const r=(Math.floor(sel/N)+dr+N)%N,c=(sel%N+dc+N)%N;sel=r*N+c;paint()}
 function openSheet(){$("ruleN").textContent=N;$("ruleK").textContent="1〜"+N;$("sheet").hidden=false;$("sheetClose").focus()}
 function closeSheet(){$("sheet").hidden=true;grid.focus()}
 addEventListener("keydown",e=>{
   if(!$("sheet").hidden){if(e.key==="Escape"||e.key==="Enter"){e.preventDefault();closeSheet()}return}
   if(e.key==="?"||e.key==="/"){e.preventDefault();openSheet();return}
-  if(e.key==="Escape"||e.key==="p"||e.key==="P"){e.preventDefault();setPause(!paused);return}
-  if(paused)return;
   if(T3.on&&(e.key==="ArrowLeft"||e.key==="ArrowRight")){e.preventDefault();T3.theta+=e.key==="ArrowLeft"?.15:-.15;return}
   const mv={ArrowUp:[-1,0],ArrowDown:[1,0],ArrowLeft:[0,-1],ArrowRight:[0,1]}[e.key];if(mv){e.preventDefault();move(...mv);return}
   if(e.key==="Enter"&&!T3.on){e.preventDefault();climbTry();return}
@@ -621,22 +655,17 @@ addEventListener("keydown",e=>{
   if(e.key==="Backspace"||e.key==="Delete"||e.key==="0"){e.preventDefault();input(0);return}
   if(e.key==="m"||e.key==="M"){memoMode=!memoMode;const b=$("memoBtn");if(b)b.setAttribute("aria-pressed",memoMode)}
 });
-setInterval(()=>{if(t0&&!tEnd&&!paused)hud()},500);
-document.querySelectorAll("[data-n]").forEach(b=>{b.setAttribute("aria-pressed",+b.dataset.n===N);b.onclick=()=>{N=+b.dataset.n;
-  document.querySelectorAll("[data-n]").forEach(x=>x.setAttribute("aria-pressed",x===b));try{localStorage.setItem("yagi-n",N)}catch(e){}newGame()}});
-$("hintBtn").onclick=()=>{if(hintLvl>=2||!sol.length)return;hintLvl++;if(!t0)t0=performance.now();
-  $("hintBtn").textContent=hintLvl===1?"ヒント（足あと）":"ヒント済み";$("hintBtn").disabled=hintLvl>=2;
-  if(T3.on){show3d(false)}build()};
-$("newq").onclick=newGame;$("c-new").onclick=newGame;$("c-retry").onclick=retry;
+setInterval(()=>{if(t0&&!tEnd)hud()},500);
+document.querySelectorAll("[data-n]").forEach(b=>{b.setAttribute("aria-pressed",+b.dataset.n===N);b.onclick=()=>{const n=+b.dataset.n;if(n===N)return;stash();N=n;
+  document.querySelectorAll("[data-n]").forEach(x=>x.setAttribute("aria-pressed",x===b));try{localStorage.setItem("yagi-n",N)}catch(e){}
+  if(STASH[N])unstash(STASH[N]);else newGame()}});
+$("hintBtn").onclick=()=>{if(!sol.length)return;hintLvl=hintLvl?0:1;if(hintLvl){hintSeen=true;if(!t0)t0=performance.now()}
+  syncHint();if(T3.on)show3d(false);build()};
+$("newq").onclick=newGame;$("c-new").onclick=newGame;
 $("rulesBtn").onclick=openSheet;$("sheetClose").onclick=closeSheet;$("sheet").onclick=e=>{if(e.target===$("sheet"))closeSheet()};
-$("c-replay").onclick=replay;$("n-replay").onclick=replay;$("n-fix").onclick=()=>{$("clear").hidden=true;show3d(false);paint()};
-$("view3d").onclick=()=>{$("clear").hidden=true;if(T3.on){show3d(false);paint()}else if(solved)replay();else show3d(true)};
-$("pause").onclick=()=>setPause(!paused);$("resume").onclick=()=>setPause(false);
-let retryArm=0;$("retry").onclick=()=>{
-  if(solved||!t0||performance.now()-retryArm<2500){retryArm=0;$("retry").textContent="最初から";retry();return}
-  retryArm=performance.now();$("retry").textContent="もう一度押すと最初から";
-  setTimeout(()=>{if(retryArm&&performance.now()-retryArm>=2500){retryArm=0;$("retry").textContent="最初から"}},2600)};
-document.addEventListener("visibilitychange",()=>{if(document.hidden&&t0&&!solved)setPause(true)});
+$("c-replay").onclick=replay;$("n-replay").onclick=replay;$("n-fix").onclick=()=>{$("clear").hidden=true;stopFx();show3d(false);paint()};
+$("view3d").onclick=()=>{$("clear").hidden=true;stopFx();if(T3.on){show3d(false);paint()}else if(solved)replay();else show3d(true)};
+$("retry").onclick=retry;
 let rt;addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{if(sol.length){layout();resize3d()}},120)});
 newGame();
 </script>
