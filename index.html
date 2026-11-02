@@ -67,6 +67,7 @@ svg.rv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;over
 .goat .face{fill:var(--badge);stroke:var(--fg);stroke-width:1.6}
 .goat .horn{fill:none;stroke:var(--fg);stroke-width:2;stroke-linecap:round}
 .goat .eye{fill:var(--fg)}
+.goat .tuft{fill:var(--badge);stroke:var(--fg);stroke-width:1.3;stroke-linejoin:round}
 .peak .pole{stroke:var(--fg);stroke-width:1.6}
 .peak .cloth{fill:var(--flag);stroke:var(--flag);stroke-width:1.1;stroke-linejoin:round}
 
@@ -113,6 +114,8 @@ svg.rv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;over
   .top{padding:6px 10px;gap:4px 8px}
   .stat{gap:10px;font-size:10px}
   .stat b{font-size:13px}
+  /* 種類が3つになって1行に収まらないので、2行目を種類だけの行にして揃える */
+  .sizes{order:3;flex-basis:100%;justify-content:center}
   .desk{padding:6px 8px;gap:6px}
   .bar{font-size:11.5px;padding:5px 10px}
   .cbig{font-size:21px}
@@ -138,9 +141,10 @@ svg.rv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;over
 <div class="app">
   <div class="top">
     <h1>ヤギのナンプレ</h1>
-    <div class="sizes" role="group" aria-label="盤の大きさ">
-      <button class="chip" data-n="4" aria-pressed="false">4×4</button>
-      <button class="chip" data-n="5" aria-pressed="true">5×5</button>
+    <div class="sizes" role="group" aria-label="問題の種類">
+      <button class="chip" data-lv="4" aria-pressed="false">4×4</button>
+      <button class="chip" data-lv="5" aria-pressed="true">5×5</button>
+      <button class="chip" data-lv="a" aria-pressed="false">アルパカ</button>
     </div>
     <div class="stat"><span>時間<b id="time">0:00</b></span></div>
     <button class="chip" id="rulesBtn">ルール</button>
@@ -176,7 +180,9 @@ svg.rv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;over
       <li>ヤギは上下左右のうち<b>一番高い岩</b>へ跳び移る。</li>
       <li>跳び移れる高い岩が隣になければ、そこが頂上でヤギは止まる。</li>
       <li>一番高い隣が<b>同じ高さで2つ</b>あると、ヤギは迷って止まる（失敗）。</li>
+      <li id="ruleAlpaca" hidden>この回は3匹のうち1匹が<b>アルパカ</b>。アルパカは<b>1段しか登れない</b>。隣との差が2以上あると崖で、登れずに足を止める（失敗）。首が長いので盤でも見分けられる。</li>
       <li>ヤギ全員が<b>別々の旗</b>に着けば成功。どのヤギがどの旗かは決まっていない。</li>
+      <li id="ruleZero" hidden>アルパカのぶん手がかりが増えるので、<b>数字のヒントが0個</b>の問題も出る。ヤギとアルパカと旗だけで答えが1つに決まる。</li>
       <li>下線の数字は、最初から決まっている高さ。</li>
       <li>行き詰まったら「ヒント」で、ヤギが通る道（足あと）を出せる。</li>
     </ul>
@@ -207,10 +213,24 @@ const $=id=>document.getElementById(id),grid=$("grid");
 const reduceMotion=matchMedia("(prefers-reduced-motion: reduce)").matches;
 let MODE="flag",hintLvl=0,N=5,sol=[],givens=new Set(),rivers=[],val=[],memo=[],sel=0,memoMode=false,stepCons=[],MK=new Set();
 let tries=0,lastMiss=new Set(),t0=0,tEnd=0,solved=false,hintSeen=false,peers=[],units=[],nbr=[],SIM=null;
-try{const n=+localStorage.getItem("yagi-n");if(n===4||n===5)N=n}catch(e){}
+/* 問題の種類。アルパカの回だけ1匹が「1段しか登れない」。
+   ヤギのルールは隣同士の大小しか見ないので、何匹増やしても高さの差については何も語らない。
+   段差の上限は差を縛る＝ヤギには原理的に出せない種類の手がかりなので、
+   これが入って初めて数字ヒント0個でも答えが1つに定まる盤が引けるようになる（設計シート10節） */
+const LVS={
+  "4":{n:4,K:2,lims:[Infinity,Infinity],needs:[1,1],want:1,cap:1200},
+  "5":{n:5,K:3,lims:[Infinity,Infinity,Infinity],needs:[2,2,2],want:2,cap:1200},
+  "a":{n:5,K:3,lims:[1,Infinity,Infinity],needs:[1,2,2],want:0,cap:3500,alpaca:true}
+};
+let LV="5",kinds=[];
+try{const v=localStorage.getItem("yagi-lv");if(LVS[v])LV=v;
+  else{const o=+localStorage.getItem("yagi-n");if(o===4||o===5)LV=""+o}}catch(e){}
+const LIM=k=>LVS[LV].lims[k],ALP=k=>kinds[k]==="a";
+const NAME=k=>ALP(k)?"アルパカ":"ヤギ"+(kinds.slice(0,k).filter(x=>x!=="a").length+1);
 
 /* 生成は「谷へ下る道」で作り、高さを上下反転して「頂上へ登る道」にする */
 function setup(){
+  N=LVS[LV].n;kinds=LVS[LV].lims.map(m=>m===Infinity?"g":"a");
   units=[];for(let r=0;r<N;r++)units.push([...Array(N)].map((_,c)=>r*N+c));
   for(let c=0;c<N;c++)units.push([...Array(N)].map((_,r)=>r*N+c));
   peers=[...Array(N*N)].map((_,i)=>{const r=Math.floor(i/N),c=i%N,s=[];for(let k=0;k<N;k++){if(k!==c)s.push(r*N+k);if(k!==r)s.push(k*N+c)}return s});
@@ -286,51 +306,70 @@ function generate(){
 
 
 /* ---------- 旗だけモード：ヤギと旗だけで答えが1つになる問題を作る ---------- */
-function climbOf(h,s){const p=[s];let i=s;while(true){let m=-1,tie=false;for(const j of nbr[i]){if(m<0||h[j]>h[m]){m=j;tie=false}else if(h[j]===h[m])tie=true}
-  if(h[m]<=h[i])return{path:p,end:i};if(tie)return null;i=m;p.push(i);if(p.length>N*N)return null}}
-function pathsOk(d,goats){const GS=new Set(goats.map(o=>o.g));
-  for(const {s} of goats){let i=s,steps=0;
-    while(steps++<=N*N){if(pc(d[i])!==1)break;const vi=lowV(d[i]);let km=-1,kv=0,tie=false,umax=0;
+/* 高さが全部決まった盤で登りをたどる。lim は一度に登れる段差の上限（アルパカは1段） */
+function climbOf(h,s,lim=Infinity){const p=[s];let i=s;while(true){let m=-1,tie=false;for(const j of nbr[i]){if(m<0||h[j]>h[m]){m=j;tie=false}else if(h[j]===h[m])tie=true}
+  if(h[m]<=h[i])return{path:p,end:i,why:"peak"};
+  if(h[m]-h[i]>lim)return{path:p,end:i,why:"cliff"};        // 崖は登れない。そこで足が止まる
+  if(tie)return null;i=m;p.push(i);if(p.length>N*N)return null}}
+/* 道に沿って候補を絞る。矛盾していれば false、絞れたら {moved:true}。d は書き換える。
+   ・道の途中のマスは必ず一歩進むので、隣のどれかが自分より高い
+   ・登れるのは「自分＋上限」まで → 隣はすべてその値以下
+   ・自分より高くなれる隣がちょうど1つなら、そこは必ず自分より高い
+   この3つを伝播に回すと、数字ヒントがぐっと減る */
+function pathsOk(d,goats){
+  const GS=new Set(goats.map(o=>o.g));let moved=false;
+  for(const {s,m} of goats){let i=s,steps=0;
+    while(steps++<=N*N){
+      if(pc(d[i])!==1)break;const vi=lowV(d[i]);
+      if(GS.has(i))break;                                      // 旗は頂上。四方より高い制約は cs 側
+      const up=nbr[i].filter(j=>highV(d[j])>vi);
+      if(!up.length)return false;                              // 進めないのに旗でない
+      if(m<Infinity)for(const j of nbr[i]){const nm=d[j]&((1<<(vi+m+1))-1);
+        if(nm!==d[j]){d[j]=nm;moved=true;if(!nm)return false}}
+      if(up.length===1){const j=up[0],nm=d[j]&~((1<<(vi+1))-1);
+        if(nm!==d[j]){d[j]=nm;moved=true;if(!nm)return false}}
+      let km=-1,kv=0,tie=false,umax=0;
       for(const j of nbr[i]){if(pc(d[j])===1){const v=lowV(d[j]);if(v>kv){kv=v;km=j;tie=false}else if(v===kv)tie=true}else umax=Math.max(umax,highV(d[j]))}
-      if(umax<vi&&kv<vi){if(!GS.has(i))return false;break}     // 頂上で止まると確定（旗の岩でなければだめ）
-      if(GS.has(i)&&kv>vi)return false;                         // 旗の岩は頂上でなければならない
-      if(kv>vi&&umax<kv){if(tie)return false;i=km;continue}     // 次の岩が確定
+      if(kv>vi&&umax<kv){if(kv-vi>m||tie)return false;i=km;continue}   // 次の岩が確定
       break}
   }
-  return true;
+  return{moved};
 }
 function solveFlag(d,goats,limit,nodeLimit){
   const cs=[];for(const {g} of goats)for(const w of nbr[g])cs.push([w,g]);  // 旗の岩は四方より高い
   const sols=[];let nodes=0,aborted=false;
   (function rec(d){if(sols.length>=limit||aborted)return;if(++nodes>nodeLimit){aborted=true;return}
-    if(!propagate(d,cs)||!pathsOk(d,goats))return;
+    for(let g=0;;g++){if(!propagate(d,cs))return;const w=pathsOk(d,goats);if(!w)return;if(!w.moved||g>40)break}
     let best=-1,bc=99;for(let i=0;i<N*N;i++){const c=pc(d[i]);if(c>1&&c<bc){bc=c;best=i}}
-    if(best<0){const h=d.map(lowV),GS=new Set(goats.map(o=>o.g)),E=goats.map(({s})=>{const c=climbOf(h,s);return c?c.end:-1});
+    if(best<0){const h=d.map(lowV),GS=new Set(goats.map(o=>o.g)),E=goats.map(({s,m})=>{const c=climbOf(h,s,m);return c&&c.why==="peak"?c.end:-1});
       if(E.every(e=>GS.has(e))&&new Set(E).size===E.length)sols.push(h);return}
     for(let v=1;v<=N;v++)if(d[best]&(1<<v)){const e=d.slice();e[best]=1<<v;rec(e);if(sols.length>=limit||aborted)return}})(d.slice());
   return{sols,aborted};
 }
-function generateFlag(){
-  const K={4:2,5:3}[N],minSteps=N===4?1:2;let best=null,checked=0;
-  for(let t=0;t<400&&checked<14;t++){
-    const h=solve(full(),[],1,true)[0],cl=[];
-    for(let i=0;i<N*N;i++){const c=climbOf(h,i);if(c&&c.path.length-1>=minSteps)cl.push(c)}
+/* 1回ぶん：地形を引いて動物を置き、答えが1つに定まるまで数字を公開する。
+   返す g の大きさが数字ヒントの個数。0 なら盤にあるのは動物と旗だけ */
+function genOne(L){
+  const h=solve(full(),[],1,true)[0],used=new Set(),goats=[],paths=[];
+  for(let k=0;k<L.K;k++){
+    const m=L.lims[k],need=L.needs[k],cl=[];
+    for(let i=0;i<N*N;i++){const c=climbOf(h,i,m);if(c&&c.why==="peak"&&c.path.length-1>=need)cl.push(c)}
     cl.sort((a,b)=>b.path.length-a.path.length+Math.random()-.5);
-    const goats=[],paths=[],used=new Set();
-    for(const c of cl){const s=c.path[0];if(used.has(s)||used.has(c.end)||paths.some(p=>p.includes(s)))continue;
-      goats.push({s,g:c.end});paths.push(c.path);used.add(s);used.add(c.end);if(goats.length===K)break}
-    if(goats.length<K)continue;checked++;
-    const g=new Set();let ok=false;
-    while(g.size<=Math.ceil(N*N/3)){const d=full();for(const i of g)d[i]=1<<h[i];
-      const r=solveFlag(d,goats,2,N===6?60000:200000);
-      if(r.sols.length===1&&!r.aborted){ok=true;break}
-      const diff=[];if(r.sols.length>=2)for(let i=0;i<N*N;i++)if(r.sols[0][i]!==r.sols[1][i]&&!g.has(i))diff.push(i);
-      const pool=diff.length?diff:[...Array(N*N).keys()].filter(i=>!g.has(i));g.add(pool[Math.random()*pool.length|0])}
-    if(!ok)continue;
-    if(!best||g.size<best.g.size)best={h,rs:paths,g};
-    if(g.size<=(N===4?1:2))break;
+    let f=null;
+    for(const c of cl){const s=c.path[0];if(used.has(s)||used.has(c.end)||paths.some(p=>p.includes(s)))continue;f=c;break}
+    if(!f)return null;
+    goats.push({s:f.path[0],g:f.end,m});paths.push(f.path);used.add(f.path[0]);used.add(f.end);
   }
-  return best;
+  const g=new Set();
+  while(g.size<=Math.ceil(N*N/3)){
+    const d=full();for(const i of g)d[i]=1<<h[i];
+    const r=solveFlag(d,goats,2,200000);
+    if(r.aborted)return null;
+    if(r.sols.length===1)return{h,rs:paths,g};
+    const diff=[];for(let i=0;i<N*N;i++)if(r.sols[0][i]!==r.sols[1][i]&&!g.has(i))diff.push(i);
+    const pool=diff.length?diff:[...Array(N*N).keys()].filter(i=>!g.has(i));
+    g.add(pool[Math.random()*pool.length|0]);
+  }
+  return null;
 }
 
 
@@ -352,6 +391,14 @@ function goatSvg(x,y,s){ // 正面向きの小さなヤギの顔（細長い顔�
     <path class="face" d="M-6 -7 Q0 -10 6 -7 L4 7 Q0 10 -4 7 Z"/>
     <path class="horn" d="M-1.5 9 L0 14 L1.5 9"/>
     <circle class="eye" cx="-2.6" cy="-2" r="1.3"/><circle class="eye" cx="2.6" cy="-2" r="1.3"/></g>`}
+function alpacaSvg(x,y,s){ // 正面向き。長い首と立った耳、角もひげも無し。ヤギとはシルエットで見分ける
+  return `<g class="goat alpaca" transform="translate(${x} ${y}) scale(${s})">
+    <path class="face" d="M-3.4 3 L-5.6 16 L5.6 16 L3.4 3 Z"/>
+    <path class="face" d="M-5.1 -5 C-6.6 -12 -5.2 -17 -3.1 -17 C-2.1 -12.5 -2.6 -7.5 -2.1 -5 Z"/>
+    <path class="face" d="M5.1 -5 C6.6 -12 5.2 -17 3.1 -17 C2.1 -12.5 2.6 -7.5 2.1 -5 Z"/>
+    <path class="face" d="M-5.4 -4 Q0 -10 5.4 -4 L4.4 5 Q0 8 -4.4 5 Z"/>
+    <path class="tuft" d="M-5.4 -4.4 Q-3.4 -9.4 0 -8.4 Q3.4 -9.4 5.4 -4.4 Q0 -1.8 -5.4 -4.4 Z"/>
+    <circle class="eye" cx="-2.5" cy="-1" r="1.25"/><circle class="eye" cx="2.5" cy="-1" r="1.25"/></g>`}
 function flagSvg(x,y,s){return `<g class="peak" transform="translate(${x} ${y}) scale(${s})"><line class="pole" x1="-6" y1="12" x2="-6" y2="-12"/><path class="cloth" d="M-6 -12 L10 -6 L-6 0 Z"/></g>`}
 function build(){
   MK=new Set(rivers.flatMap(p=>[p[0],p[p.length-1]]));
@@ -366,7 +413,7 @@ function build(){
     const c=i%N,r=Math.floor(i/N),x=c*CS+CS*.05+B/2,y=r*CS+CS*.05+B/2;
     return `<g class="mk ${kind}"><rect class="plate" x="${x-B/2}" y="${y-B/2}" width="${B}" height="${B}" rx="${B*.28}"/>${icon(x,y)}</g>`};
   rivers.forEach(p=>{s+=mk(p[p.length-1],"flag",(x,y)=>flagSvg(x-B*.07,y,B/30))});
-  rivers.forEach(p=>{s+=mk(p[0],"goat",(x,y)=>goatSvg(x,y+B*.04,B/35))});
+  rivers.forEach((p,k)=>{s+=mk(p[0],"goat",(x,y)=>ALP(k)?alpacaSvg(x,y+B*.03,B/40):goatSvg(x,y+B*.04,B/35))});
   s+=`</svg>`;
   grid.innerHTML=h+s+cl;
   grid.querySelectorAll(".cell").forEach(el=>el.onpointerdown=e=>{e.preventDefault();sel=+el.dataset.i;grid.focus();paint()});
@@ -401,10 +448,12 @@ function input(v){
 /* ---------- 登らせてみる ---------- */
 function simulate(){
   const res=[];let ok=true;
-  rivers.forEach(p=>{
-    const path=[p[0]];let i=p[0],end="peak";
+  rivers.forEach((p,a)=>{
+    const lim=LIM(a),path=[p[0]];let i=p[0],end="peak";
     for(let k=0;k<N*N;k++){let m=-1,tie=-1;for(const j of nbr[i]){if(m<0||val[j]>val[m]){m=j;tie=-1}else if(val[j]===val[m])tie=j}
-      if(val[m]<=val[i])break;if(tie>=0){end="tie";break}path.push(m);i=m}
+      if(val[m]<=val[i])break;
+      if(val[m]-val[i]>lim){end="cliff";break}                 // 崖に阻まれた
+      if(tie>=0){end="tie";break}path.push(m);i=m}
     let div=-1;for(let k=0;k<Math.max(path.length,p.length);k++)if(path[k]!==p[k]){div=k;break}
     res.push({path,end,div,plan:p});
   });
@@ -431,13 +480,14 @@ function showResult(){
     confetti();
   }else{
     $("cbig").textContent="ちがう岩に着いた";
-    const why=[];sim.res.forEach((r,k)=>{if(r.good)return;const last=r.path[r.path.length-1];
-      if(r.end==="tie")why.push(`ヤギ${k+1}：${P(last)}で迷った（同じ高さの隣が2つ）`);
-      else if(sim.res.some((q,j)=>j!==k&&q.path[q.path.length-1]===last))why.push(`ヤギ${k+1}：ほかのヤギと同じ旗（${P(last)}）`);
-      else if(rivers.every(p=>p[p.length-1]!==last))why.push(`ヤギ${k+1}：旗のない${P(last)}で止まった`);
-      else if(r.div>=r.path.length)why.push(`ヤギ${k+1}：${P(last)}で止まった（頂上はまだ先）`);
-      else if(r.div>=r.plan.length)why.push(`ヤギ${k+1}：予定の頂上より高い岩へ進んだ`);
-      else why.push(`ヤギ${k+1}：${P(r.path[r.div-1])}から予定と違う岩へ跳んだ`)});
+    const why=[];sim.res.forEach((r,k)=>{if(r.good)return;const last=r.path[r.path.length-1],nm=NAME(k);
+      if(r.end==="cliff")why.push(`${nm}：${P(last)}の先が2段以上の崖で登れない（1段ずつしか登れない）`);
+      else if(r.end==="tie")why.push(`${nm}：${P(last)}で迷った（同じ高さの隣が2つ）`);
+      else if(sim.res.some((q,j)=>j!==k&&q.path[q.path.length-1]===last))why.push(`${nm}：ほかの子と同じ旗（${P(last)}）`);
+      else if(rivers.every(p=>p[p.length-1]!==last))why.push(`${nm}：旗のない${P(last)}で止まった`);
+      else if(r.div>=r.path.length)why.push(`${nm}：${P(last)}で止まった（頂上はまだ先）`);
+      else if(r.div>=r.plan.length)why.push(`${nm}：予定の頂上より高い岩へ進んだ`);
+      else why.push(`${nm}：${P(r.path[r.div-1])}から予定と違う岩へ跳んだ`)});
     if(sim.dup)why.push("行か列に同じ高さが2つある");
     $("ct").innerHTML=`<div class="why">${why.join("<br>")}</div>`;
     if(T3.on)lastMiss.forEach(c=>badMark(c));
@@ -492,6 +542,27 @@ function makeGoat(k=0){
   g.traverse(o=>{if(o.isMesh)o.castShadow=true});g.scale.setScalar(size);g.userData.head=head;g.userData.size=size;
   return g;
 }
+/* アルパカ：まっすぐ立った長い首と立った耳。角もあごひげも無く、脚が細長い */
+function makeAlpaca(){
+  const g=new THREE.Group(),size=1.1,
+    W=new THREE.MeshStandardMaterial({color:0xe9dfcc,roughness:.95}),
+    D=new THREE.MeshStandardMaterial({color:0x34352f,roughness:.6}),
+    K=new THREE.MeshStandardMaterial({color:0xcfa892,roughness:.8});
+  const box=(w,h,d,m,x,y,z)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);g.add(o);return o};
+  box(.33,.22,.23,W,-.02,.31,0);                                        // ふっくらした胴
+  for(const [x,z] of [[.1,.075],[.1,-.075],[-.12,.075],[-.12,-.075]]){box(.045,.22,.045,W,x,.12,z);box(.05,.035,.05,D,x,.018,z)}
+  const neck=box(.09,.26,.1,W,.13,.5,0);neck.rotation.z=.1;             // 立った首
+  const head=new THREE.Group();head.position.set(.16,.66,0);g.add(head);
+  const hb=(w,h,d,m,x,y,z)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);head.add(o);return o};
+  hb(.12,.1,.1,W,0,.02,0);hb(.075,.065,.085,K,.08,-.015,0);             // 小さな頭と鼻先
+  hb(.105,.055,.1,W,-.015,.085,0);                                      // 前髪のもふもふ
+  for(const s of [1,-1]){
+    const ear=hb(.028,.13,.022,W,-.03,.15,.03*s);ear.rotation.x=.22*s;   // 長く立った耳
+    const eye=new THREE.Mesh(new THREE.SphereGeometry(.015,8,8),D);eye.position.set(.055,.04,.045*s);head.add(eye)}
+  const tail=box(.04,.055,.03,W,-.19,.37,0);tail.rotation.z=-.5;
+  g.traverse(o=>{if(o.isMesh)o.castShadow=true});g.scale.setScalar(size);g.userData.head=head;g.userData.size=size;
+  return g;
+}
 function makeFlag(ghost){
   const g=new THREE.Group(),col=new THREE.Color(cssv("--flag"));
   const pole=new THREE.Mesh(new THREE.CylinderGeometry(.014,.014,.55,8),new THREE.MeshStandardMaterial({color:0x3a3b39,transparent:ghost,opacity:ghost?.35:1}));
@@ -522,7 +593,7 @@ function build3d(){
   const mat=new THREE.LineDashedMaterial({color:new THREE.Color(cssv("--route")),dashSize:.05,gapSize:.08});
   T3.lines=hintLvl<1?[]:rivers.map(p=>{const ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints(routePts(p)),mat);ln.computeLineDistances();g.add(ln);return{ln,p}});
   T3.flags=rivers.map(p=>{const f=makeFlag(true),e=p[p.length-1],[x,z]=cellXZ(e);f.position.set(x+.28,0,z-.28);f.userData.cell=e;g.add(f);return f});
-  T3.goats=rivers.map((p,k)=>{const go=makeGoat(k),[x,z]=cellXZ(p[0]);go.position.set(x,0,z);g.add(go);
+  T3.goats=rivers.map((p,k)=>{const go=ALP(k)?makeAlpaca():makeGoat(k),[x,z]=cellXZ(p[0]);go.position.set(x,0,z);g.add(go);
     if(p.length>1){const [nx,nz]=cellXZ(p[1]);go.rotation.y=Math.atan2(-(nz-z),nx-x)}return{g:go,cell:p[0]}});
 }
 function show3d(on,{climb=false}={}){
@@ -627,20 +698,35 @@ function stopFx(){FX.on=false;const cv=$("fx");if(cv&&!cv.hidden){cv.getContext(
 /* ---------- 進行 ---------- */
 function fmt(ms){const s=Math.floor(ms/1000);return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")}
 function hud(){$("time").textContent=fmt(tEnd?tEnd-t0:t0?performance.now()-t0:0)}
-function intro(){$("bar").innerHTML=`ヤギは上下左右で<b>一番高いマス</b>へ跳ぶ。それぞれ<b>別の旗</b>にたどり着けば成功！`}
+function intro(){$("bar").innerHTML=LVS[LV].alpaca
+  ?`ヤギは<b>一番高いマス</b>へ跳ぶ。<b>アルパカは1段</b>しか登れない。それぞれ<b>別の旗</b>へ！`
+  :`ヤギは上下左右で<b>一番高いマス</b>へ跳ぶ。それぞれ<b>別の旗</b>にたどり着けば成功！`}
 function syncHint(){$("hintBtn").setAttribute("aria-pressed",hintLvl>0)}
 function resetState(){if(T3.on)show3d(false);stopFx();lastMiss=new Set();SIM=null;tEnd=0;solved=false;$("clear").hidden=true;syncHint();intro();hud()}
 function newGame(){
   setup();$("bar").textContent="岩山を作っています…";
-  setTimeout(()=>{const g=generateFlag();sol=g.h;rivers=g.rs;stepCons=rivers.flatMap(p=>p.slice(0,-1).map((u,k)=>({u,v:p[k+1]})));givens=g.g;
-    val=[...Array(N*N)].map((_,i)=>givens.has(i)?sol[i]:0);memo=Array(N*N).fill(0);sel=0;hintLvl=0;hintSeen=false;tries=0;t0=0;layout();resetState();paint()},20);
+  const L=LVS[LV],T0=performance.now();let best=null;
+  const done=b=>{sol=b.h;rivers=b.rs;stepCons=rivers.flatMap(p=>p.slice(0,-1).map((u,k)=>({u,v:p[k+1]})));givens=b.g;
+    val=[...Array(N*N)].map((_,i)=>givens.has(i)?sol[i]:0);memo=Array(N*N).fill(0);sel=0;hintLvl=0;hintSeen=false;tries=0;t0=0;layout();resetState();paint()};
+  /* 数字ヒントが want 個以下になる盤を狙って引き続ける。アルパカの回は 0 個が狙い。
+     60ms ずつに切って、あいだでブラウザに描かせる（固まらせない） */
+  const slice=()=>{
+    const S=performance.now();
+    while(performance.now()-S<60){
+      const r=genOne(L);
+      if(r&&(!best||r.g.size<best.g.size))best=r;
+      if(best&&(best.g.size<=L.want||performance.now()-T0>L.cap))return done(best);
+    }
+    setTimeout(slice,0);
+  };
+  setTimeout(slice,20);
 }
 function retry(){val=[...Array(N*N)].map((_,i)=>givens.has(i)?sol[i]:0);memo=Array(N*N).fill(0);sel=0;tries=0;t0=0;resetState();paint()}
 
 /* 盤の大きさを切り替えても、それぞれの問題を覚えておく */
 const STASH={};
 const elapsed=()=>tEnd?tEnd-t0:t0?performance.now()-t0:0;
-function stash(){if(sol.length)STASH[N]={sol,rivers,stepCons,givens,val,memo,sel,hintLvl,hintSeen,tries,solved,lastMiss,SIM,el:elapsed()}}
+function stash(){if(sol.length)STASH[LV]={sol,rivers,stepCons,givens,val,memo,sel,hintLvl,hintSeen,tries,solved,lastMiss,SIM,el:elapsed()}}
 function unstash(s){
   sol=s.sol;rivers=s.rivers;stepCons=s.stepCons;givens=s.givens;val=s.val;memo=s.memo;sel=s.sel;
   hintLvl=s.hintLvl;hintSeen=s.hintSeen;tries=s.tries;solved=s.solved;lastMiss=s.lastMiss;SIM=s.SIM;
@@ -649,7 +735,9 @@ function unstash(s){
   layout();$("clear").hidden=true;syncHint();intro();hud();paint();
 }
 function move(dr,dc){const r=(Math.floor(sel/N)+dr+N)%N,c=(sel%N+dc+N)%N;sel=r*N+c;paint()}
-function openSheet(){$("ruleN").textContent=N;$("ruleK").textContent="1〜"+N;$("sheet").hidden=false;$("sheetClose").focus()}
+function openSheet(){$("ruleN").textContent=N;$("ruleK").textContent="1〜"+N;
+  const a=!!LVS[LV].alpaca;$("ruleAlpaca").hidden=!a;$("ruleZero").hidden=!a;
+  $("sheet").hidden=false;$("sheetClose").focus()}
 function closeSheet(){$("sheet").hidden=true;grid.focus()}
 addEventListener("keydown",e=>{
   if(!$("sheet").hidden){if(e.key==="Escape"||e.key==="Enter"){e.preventDefault();closeSheet()}return}
@@ -663,9 +751,9 @@ addEventListener("keydown",e=>{
   if(e.key==="m"||e.key==="M"){memoMode=!memoMode;const b=$("memoBtn");if(b)b.setAttribute("aria-pressed",memoMode)}
 });
 setInterval(()=>{if(t0&&!tEnd)hud()},500);
-document.querySelectorAll("[data-n]").forEach(b=>{b.setAttribute("aria-pressed",+b.dataset.n===N);b.onclick=()=>{const n=+b.dataset.n;if(n===N)return;stash();N=n;
-  document.querySelectorAll("[data-n]").forEach(x=>x.setAttribute("aria-pressed",x===b));try{localStorage.setItem("yagi-n",N)}catch(e){}
-  if(STASH[N])unstash(STASH[N]);else newGame()}});
+document.querySelectorAll("[data-lv]").forEach(b=>{b.setAttribute("aria-pressed",b.dataset.lv===LV);b.onclick=()=>{const v=b.dataset.lv;if(v===LV)return;stash();LV=v;N=LVS[LV].n;
+  document.querySelectorAll("[data-lv]").forEach(x=>x.setAttribute("aria-pressed",x===b));try{localStorage.setItem("yagi-lv",LV)}catch(e){}
+  if(STASH[LV])unstash(STASH[LV]);else newGame()}});
 $("hintBtn").onclick=()=>{if(!sol.length)return;hintLvl=hintLvl?0:1;if(hintLvl){hintSeen=true;if(!t0)t0=performance.now()}
   syncHint();if(T3.on)show3d(false);build()};
 $("newq").onclick=newGame;$("c-new").onclick=newGame;
