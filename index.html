@@ -108,14 +108,14 @@ svg.rv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;over
 .paper .kb{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
 .paper .x{margin-top:14px;display:flex;justify-content:flex-end}
 
+/* 種類が4つあって1行に収まらない幅では、2行目を種類だけの行にして揃える(1行に要るのは約575px) */
+@media (max-width:640px){ .sizes{order:3;flex-basis:100%;justify-content:center} }
 /* スマホ縦：帯を薄く、記録は要点だけ */
 @media (max-width:430px){
   h1{font-size:12.5px}
   .top{padding:6px 10px;gap:4px 8px}
   .stat{gap:10px;font-size:10px}
   .stat b{font-size:13px}
-  /* 種類が3つになって1行に収まらないので、2行目を種類だけの行にして揃える */
-  .sizes{order:3;flex-basis:100%;justify-content:center}
   .desk{padding:6px 8px;gap:6px}
   .bar{font-size:11.5px;padding:5px 10px}
   .cbig{font-size:21px}
@@ -142,8 +142,9 @@ svg.rv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;over
   <div class="top">
     <h1>ヤギのナンプレ</h1>
     <div class="sizes" role="group" aria-label="問題の種類">
-      <button class="chip" data-lv="4" aria-pressed="false">4×4</button>
-      <button class="chip" data-lv="5" aria-pressed="true">5×5</button>
+      <button class="chip" data-lv="e" aria-pressed="false">かんたん</button>
+      <button class="chip" data-lv="n" aria-pressed="false">ふつう</button>
+      <button class="chip" data-lv="h" aria-pressed="true">むずかしい</button>
       <button class="chip" data-lv="a" aria-pressed="false">アルパカ</button>
     </div>
     <div class="stat"><span>時間<b id="time">0:00</b></span></div>
@@ -213,18 +214,31 @@ const $=id=>document.getElementById(id),grid=$("grid");
 const reduceMotion=matchMedia("(prefers-reduced-motion: reduce)").matches;
 let MODE="flag",hintLvl=0,N=5,sol=[],givens=new Set(),rivers=[],val=[],memo=[],sel=0,memoMode=false,stepCons=[],MK=new Set();
 let tries=0,lastMiss=new Set(),t0=0,tEnd=0,solved=false,hintSeen=false,peers=[],units=[],nbr=[],SIM=null;
-/* 問題の種類。アルパカの回だけ1匹が「1段しか登れない」。
-   ヤギのルールは隣同士の大小しか見ないので、何匹増やしても高さの差については何も語らない。
-   段差の上限は差を縛る＝ヤギには原理的に出せない種類の手がかりなので、
-   これが入って初めて数字ヒント0個でも答えが1つに定まる盤が引けるようになる（設計シート10節） */
+/* 問題の種類。難しさの軸は「分岐の数」ではなく **ナンプレからの距離** で切る。
+   同じ答えの盤でも、動物がいなければ数字ヒントは10個要る。動物がいると何個で済むか＝
+   動物が肩代わりしている情報の割合で、これが大きいほど「慣れた数字」ではなく
+   「新しいヤギ」で解くことになる（設計シート10節・12節）。
+
+     かんたん   4×4 ヤギ2匹   数字4〜7個   動物が担う 37%
+     ふつう     5×5 ヤギ3匹   数字3〜4個   動物が担う 63%
+     むずかしい 5×5 ヤギ3匹   数字2個以下  動物が担う 84%
+     アルパカ   5×5 ア1+ヤ2   数字0個      動物が担う 100%
+
+   ふつうでヤギを2匹に減らす案は測って却下した。2匹なのに数字が少なく済む盤＝
+   たまたま2匹が大量に情報を持つ盤なので、担う率が73%まで上がって逆に遠ざかる。
+   素直に2匹を引くと今度は数字が5個前後必要になり、ナンプレに寄りすぎる。
+   ヤギは3匹のまま、数字の帯だけで分けるのが筋。lo〜hi がその帯。 */
 const LVS={
-  "4":{n:4,K:2,lims:[Infinity,Infinity],needs:[1,1],want:1,cap:1200},
-  "5":{n:5,K:3,lims:[Infinity,Infinity,Infinity],needs:[2,2,2],want:2,cap:1200},
-  "a":{n:5,K:3,lims:[1,Infinity,Infinity],needs:[1,2,2],want:0,cap:3500,alpaca:true}
+  "e":{n:4,K:2,lims:[Infinity,Infinity],needs:[1,1],lo:4,hi:7,cap:1200},
+  "n":{n:5,K:3,lims:[Infinity,Infinity,Infinity],needs:[2,2,2],lo:3,hi:4,cap:1500},
+  "h":{n:5,K:3,lims:[Infinity,Infinity,Infinity],needs:[2,2,2],lo:0,hi:2,cap:2500},
+  "a":{n:5,K:3,lims:[1,Infinity,Infinity],needs:[1,2,2],lo:0,hi:0,cap:3500,alpaca:true}
 };
-let LV="5",kinds=[];
-try{const v=localStorage.getItem("yagi-lv");if(LVS[v])LV=v;
-  else{const o=+localStorage.getItem("yagi-n");if(o===4||o===5)LV=""+o}}catch(e){}
+let LV="h",kinds=[];
+try{const v=localStorage.getItem("yagi-lv");
+  if(LVS[v])LV=v;
+  else if(v==="4")LV="e";else if(v==="5")LV="h";      // 旧「4×4 / 5×5」からの引き継ぎ
+  else{const o=+localStorage.getItem("yagi-n");if(o===4)LV="e";else if(o===5)LV="h"}}catch(e){}
 const LIM=k=>LVS[LV].lims[k],ALP=k=>kinds[k]==="a";
 const NAME=k=>ALP(k)?"アルパカ":"ヤギ"+(kinds.slice(0,k).filter(x=>x!=="a").length+1);
 
@@ -708,14 +722,15 @@ function newGame(){
   const L=LVS[LV],T0=performance.now();let best=null;
   const done=b=>{sol=b.h;rivers=b.rs;stepCons=rivers.flatMap(p=>p.slice(0,-1).map((u,k)=>({u,v:p[k+1]})));givens=b.g;
     val=[...Array(N*N)].map((_,i)=>givens.has(i)?sol[i]:0);memo=Array(N*N).fill(0);sel=0;hintLvl=0;hintSeen=false;tries=0;t0=0;layout();resetState();paint()};
-  /* 数字ヒントが want 個以下になる盤を狙って引き続ける。アルパカの回は 0 個が狙い。
-     60ms ずつに切って、あいだでブラウザに描かせる（固まらせない） */
+  /* 数字ヒントが lo〜hi 個に収まる盤を狙って引き続ける。「少ないほど良い」ではなく
+     帯で選ぶ（ふつうは少なすぎてもだめ）。60ms ずつに切って、あいだでブラウザに描かせる */
+  const off=k=>k<L.lo?L.lo-k:(k>L.hi?k-L.hi:0);
   const slice=()=>{
     const S=performance.now();
     while(performance.now()-S<60){
       const r=genOne(L);
-      if(r&&(!best||r.g.size<best.g.size))best=r;
-      if(best&&(best.g.size<=L.want||performance.now()-T0>L.cap))return done(best);
+      if(r&&(!best||off(r.g.size)<off(best.g.size)))best=r;
+      if(best&&(off(best.g.size)===0||performance.now()-T0>L.cap))return done(best);
     }
     setTimeout(slice,0);
   };
