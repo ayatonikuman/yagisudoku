@@ -12,6 +12,8 @@
   --fg:#222322; --muted:#757672; --entry:#2d3230; --bad:#a1452f; --chrome:#f2f2ef; --line:#d6d7d3; --shadow:rgba(0,0,0,.18);
   --flag:#d9822b; --badge:#fcfcfa; --nb:rgba(34,35,34,.26);
   --ui:"Noto Sans JP","Hiragino Sans","Yu Gothic",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --sa-t:env(safe-area-inset-top,0px); --sa-r:env(safe-area-inset-right,0px);
+  --sa-b:env(safe-area-inset-bottom,0px); --sa-l:env(safe-area-inset-left,0px);
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --table:#181918; --lo:#262725; --hi:#62645f; --grid:#383937; --frame:#9a9b98; --route:#8a8b87;
@@ -26,7 +28,7 @@
 *,*::before,*::after{box-sizing:border-box}
 html,body{height:100%;margin:0}
 @supports (height:100dvh){html,body{height:100dvh}}
-html{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+html{padding:var(--sa-t) var(--sa-r) var(--sa-b) var(--sa-l)}
 body{background:var(--table);color:var(--fg);font:14px/1.45 var(--ui);overflow:hidden;overscroll-behavior:none;-webkit-text-size-adjust:100%}
 .app{height:100%;display:flex;flex-direction:column}
 
@@ -45,7 +47,7 @@ h1{font-size:14px;font-weight:700;margin:0;letter-spacing:.04em;white-space:nowr
 /* 真ん中：盤と操作。縦画面は 盤→数字→道具、横長は盤の横に操作を寄せて盤を大きく取る */
 .desk{flex:1;min-height:0;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:8px 12px}
 .bwrap{position:relative;flex:0 1 auto;min-height:0;min-width:0;display:flex;align-items:center;justify-content:center}
-.side{position:relative;flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;z-index:2}
+.side{position:relative;flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;z-index:2;max-height:100%}
 .grid{position:relative;width:var(--gs);height:var(--gs);border:2px solid var(--frame);flex:none;box-shadow:0 1px 3px var(--shadow);outline:none;background:var(--lo);touch-action:manipulation}
 .tile{position:absolute;width:var(--cs);height:var(--cs);box-shadow:inset 0 0 0 .5px var(--grid);background:color-mix(in srgb,var(--hi) var(--h,0%),var(--lo));transition:background-color .25s}
 .tile.nb::after{content:"";position:absolute;inset:0;box-shadow:inset 0 0 0 2px var(--nb)}
@@ -84,12 +86,13 @@ svg.rv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;over
 .desk.d3:has(#clear:not([hidden])) .side{visibility:hidden}
 
 #c3d{position:absolute;inset:0;width:100%;height:100%;z-index:1;touch-action:none;cursor:grab;display:block}
-.bar{flex:none;background:var(--chrome);border-top:1px solid var(--line);color:var(--muted);font-size:12px;line-height:1.5;padding:6px 14px;text-align:center}
+.bar{flex:none;background:var(--chrome);border-top:1px solid var(--line);color:var(--muted);font-size:12px;line-height:1.5;padding:6px 20px;text-align:center}
+.bar .line{display:inline-block;max-width:34em}
 .bar b{color:var(--fg);font-weight:500}
 #fx{position:absolute;inset:0;width:100%;height:100%;z-index:3;pointer-events:none}
 .clear{position:absolute;inset:0;display:grid;place-items:end center;padding-bottom:12px;pointer-events:none;z-index:4}
 .ccard{pointer-events:auto;background:var(--chrome);border:1px solid var(--line);border-radius:14px;padding:14px 20px;text-align:center;box-shadow:0 12px 32px var(--shadow);
-  animation:pop .55s cubic-bezier(.2,1.6,.4,1) both;max-width:min(420px,calc(100vw - 28px))}
+  animation:pop .55s cubic-bezier(.2,1.6,.4,1) both;max-width:min(420px,calc(100vw - 28px));max-height:100%;overflow:auto}
 .cbig{font-size:26px;font-weight:700;letter-spacing:.12em;line-height:1.2;color:var(--flag)}
 .ct{font:500 13px var(--mono);color:var(--muted);margin-top:4px;font-variant-numeric:tabular-nums}
 .ct .why{font:400 12px/1.65 var(--ui);color:var(--fg);text-align:left;margin-top:6px}
@@ -98,9 +101,10 @@ svg.rv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;over
 @media (prefers-reduced-motion: reduce){.ccard{animation:none}}
 
 /* ルールの紙 */
-.sheet{position:fixed;inset:0;z-index:9;background:rgba(0,0,0,.4);display:grid;place-items:center;padding:16px}
+.sheet{position:fixed;inset:0;z-index:9;background:rgba(0,0,0,.4);display:grid;place-items:center;padding:calc(18px + var(--sa-t)) calc(18px + var(--sa-r)) calc(18px + var(--sa-b)) calc(18px + var(--sa-l))}
 .paper{background:var(--chrome);border:1px solid var(--line);border-radius:14px;padding:16px 18px;max-width:430px;max-height:100%;overflow:auto;box-shadow:0 14px 40px var(--shadow)}
 .paper h2{font-size:12px;margin:0 0 8px;letter-spacing:.1em;color:var(--muted)}
+.paper .lead{font-size:13.5px;line-height:1.6;margin:0 0 10px}
 .paper ul{margin:0;padding-left:1.1em;font-size:13px;line-height:1.8}
 .paper dl{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:12px;margin:0}
 .paper dt{font:600 11px var(--mono);white-space:nowrap}
@@ -117,15 +121,28 @@ svg.rv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;over
   .stat{gap:10px;font-size:10px}
   .stat b{font-size:13px}
   .desk{padding:6px 8px;gap:6px}
-  .bar{font-size:11.5px;padding:5px 10px}
+  .bar{font-size:11.5px;padding:5px 16px}
   .cbig{font-size:21px}
 }
-/* 指で押す端末：当たり判定を広げる */
+/* 指で押す端末：当たり判定を広げる。あわせて画面の四隅のRから帯の中身を逃がす。
+   ノッチ等で既に余白（env）がある端末ではその分を差し引くので、二重に空かない */
 @media (pointer:coarse){
   .pad button{min-width:44px;height:44px;font-size:17px}
   .pad button.txt{font-size:12.5px}
   .pad button.go{font-size:14px}
   .chip{padding:7px 11px}
+  .top{padding:max(7px,calc(12px - var(--sa-t))) max(14px,calc(21px - var(--sa-r))) 8px max(14px,calc(21px - var(--sa-l)))}
+  .bar{padding:6px max(20px,calc(26px - var(--sa-r))) max(6px,calc(11px - var(--sa-b))) max(20px,calc(26px - var(--sa-l)))}
+  .sheet{padding:calc(24px + var(--sa-t)) calc(24px + var(--sa-r)) calc(24px + var(--sa-b)) calc(24px + var(--sa-l))}
+  .paper{padding:18px 20px}
+}
+/* 縦長で背が低い（小さな端末・分割画面）：帯と道具を詰めて、そのぶん盤に回す */
+@media (orientation:portrait) and (max-height:640px){
+  .top{padding:4px 10px;gap:3px 7px}
+  .chip{padding:5px 9px;font-size:11.5px}
+  .pad button{min-width:38px;height:38px;font-size:15px}
+  .pad button.txt{font-size:11.5px}
+  .bar{padding:4px 16px;font-size:11px}
 }
 /* 横長（PC・スマホ横）：盤の横に操作を置いて盤を大きく取る */
 @media (orientation:landscape){
@@ -133,6 +150,20 @@ svg.rv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;over
   .side{width:auto;max-width:min(40%,250px)}
   .pad{max-width:228px}
   .tools{max-width:172px}
+}
+/* 横長で背が低い（スマホを横にした・分割画面）：縦に使える高さが 400px を切ると、
+   帯が2段に折り返したうえ道具も積み上がって、盤と道具が画面からあふれる。
+   ここだけ全体を一回り小さくして、種類の並びも1行に戻す */
+@media (orientation:landscape) and (max-height:460px){
+  .top{padding:4px 12px;gap:3px 9px}
+  .sizes{order:0;flex-basis:auto}
+  .chip{padding:5px 9px;font-size:11.5px}
+  .pad button{min-width:34px;height:34px;font-size:15px}
+  .pad button.txt{font-size:11.5px}
+  .pad button.go{font-size:12.5px;padding:0 12px}
+  .pad,.tools{max-width:252px}
+  .bar{padding:4px 18px;font-size:11px}
+  .desk{gap:10px;padding:8px 12px}
 }
 </style>
 </head>
@@ -169,23 +200,22 @@ svg.rv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;over
       <div class="cbtn" id="ok-btns"><button class="chip" id="c-replay">もう一度見る</button><button class="chip on" id="c-new">次の問題</button></div>
       <div class="cbtn" id="ng-btns" hidden><button class="chip" id="n-replay">もう一度見る</button><button class="chip on" id="n-fix">上から見て直す</button></div></div></div>
   </div>
-  <div class="bar" id="bar"></div>
+  <div class="bar" id="bar"><span class="line" id="barTxt"></span></div>
 </div>
 
 <div class="sheet" id="sheet" hidden>
   <div class="paper" role="dialog" aria-modal="true" aria-label="ルールとキー操作">
     <h2>ルール</h2>
+    <p class="lead">数字を埋めて、<b>ヤギを別々の旗まで登らせる</b>パズル。</p>
     <ul>
-      <li>ナンプレと同じで、<b>各行・各列に <span id="ruleK">1〜5</span> をひとつずつ</b>。同じ行・同じ列に同じ数字は置けない（ブロックの区切りはない）。</li>
-      <li>数字は<b>岩の高さ</b>。大きいほど高く、盤では濃く見える。</li>
-      <li>ヤギは上下左右のうち<b>一番高い岩</b>へ跳び移る。</li>
-      <li>跳び移れる高い岩が隣になければ、そこが頂上でヤギは止まる。</li>
-      <li>一番高い隣が<b>同じ高さで2つ</b>あると、ヤギは迷って止まる（失敗）。</li>
-      <li id="ruleAlpaca" hidden>この回は3匹のうち1匹が<b>アルパカ</b>。アルパカは<b>1段しか登れない</b>。隣との差が2以上あると崖で、登れずに足を止める（失敗）。首が長いので盤でも見分けられる。</li>
-      <li>ヤギ全員が<b>別々の旗</b>に着けば成功。どのヤギがどの旗かは決まっていない。</li>
-      <li id="ruleZero" hidden>アルパカのぶん手がかりが増えるので、<b>数字のヒントが0個</b>の問題も出る。ヤギとアルパカと旗だけで答えが1つに決まる。</li>
+      <li>ナンプレと同じで、<b>各行・各列に <span id="ruleK">1〜5</span> をひとつずつ</b>。</li>
+      <li>入れた数字は<b>岩の高さ</b>。大きいほど高く、濃く見える。</li>
+      <li>ヤギは上下左右で<b>一番高い岩へ跳ぶ</b>。これを繰り返し、自分より高い隣が無くなったら止まる。</li>
+      <li>一番高い隣が<b>同じ高さで2つ</b>あると、ヤギは迷って止まる。</li>
+      <li id="ruleAlpaca" hidden><b>アルパカは1段ずつ</b>しか登れず、2段以上の差は崖になって登れない。首が長いので見分けられる。そのぶん手がかりが増えるので、<b>数字のヒントが0個</b>の問題も出る。</li>
+      <li>全員が<b>別々の旗</b>で止まれば成功。どの子がどの旗かは決まっていない。</li>
       <li>下線の数字は、最初から決まっている高さ。</li>
-      <li>行き詰まったら「ヒント」で、ヤギが通る道（足あと）を出せる。</li>
+      <li>埋め終わったら<b>「登らせる」</b>。迷ったら「ヒント」でヤギの通り道が出る。</li>
     </ul>
     <div class="kb">
       <h2>キー操作</h2>
@@ -195,7 +225,7 @@ svg.rv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;over
         <dt>Shift+数字 / M</dt><dd>候補メモ</dd>
         <dt>0 / Backspace</dt><dd>消す</dd>
         <dt>Enter</dt><dd>登らせる</dd>
-        <dt>?</dt><dd>この紙を開く（Esc で閉じる）</dd>
+        <dt>?</dt><dd>ルールを開く（Esc で閉じる）</dd>
       </dl>
     </div>
     <div class="x"><button class="chip on" id="sheetClose">閉じる</button></div>
@@ -395,7 +425,7 @@ function layout(){
   const d=$("desk"),sd=d.querySelector(".side"),cs=getComputedStyle(d),row=cs.flexDirection==="row",gap=parseFloat(cs.gap)||8;
   const w=d.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight)-(row?sd.offsetWidth+gap:0);
   const h=d.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom)-(row?0:sd.offsetHeight+gap);
-  const gs=Math.max(180,Math.min(w,h,560));CS=(gs-4)/N;
+  const gs=Math.max(140,Math.min(w,h,560));CS=(gs-4)/N;
   grid.style.setProperty("--gs",gs+"px");grid.style.setProperty("--cs",CS+"px");build();
 }
 function goatSvg(x,y,s){ // 正面向きの小さなヤギの顔（細長い顔・後ろに反る角・横に出る耳・あごひげ）
@@ -420,8 +450,10 @@ function build(){
   for(let i=0;i<N*N;i++){const pos=`left:${(i%N)*CS}px;top:${Math.floor(i/N)*CS}px`;h+=`<div class="tile" data-t="${i}" style="${pos}"></div>`;cl+=`<div class="cell" data-i="${i}" style="${pos}"></div>`}
   let s=`<svg class="rv" viewBox="0 0 ${N*CS} ${N*CS}" aria-hidden="true">`;
   if(hintLvl>=1)stepCons.forEach(st=>{const [x1,y1]=ctr(st.u),[x2,y2]=ctr(st.v);s+=`<line class="route" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
-    const mx=(x1+x2)/2,my=(y1+y2)/2,ang=Math.atan2(y2-y1,x2-x1)*180/Math.PI,a=CS*.07;
-    s+=`<path class="tick" d="M${-a} ${-a} L${a*.4} 0 L${-a} ${a}" transform="translate(${mx} ${my}) rotate(${ang})"/>`});
+    // 矢印は境目だと「どっちのマスの話か」が読み取れないので、跳んだ先のマスの中に置く。
+    // 0.7 は中心の数字（半径 .14CS ほど）と左上の札（中心から -.07CS より外）のどちらにも当たらない位置
+    const ax=x1+(x2-x1)*.7,ay=y1+(y2-y1)*.7,ang=Math.atan2(y2-y1,x2-x1)*180/Math.PI,a=CS*.09;
+    s+=`<path class="tick" d="M${-a} ${-a} L${a*.45} 0 L${-a} ${a}" transform="translate(${ax} ${ay}) rotate(${ang})"/>`});
   // ヤギと旗はマスの左上に札で固める。真ん中は入力した数字のために空けておき、番号は左下へ
   const B=CS*.38,mk=(i,kind,icon)=>{
     const c=i%N,r=Math.floor(i/N),x=c*CS+CS*.05+B/2,y=r*CS+CS*.05+B/2;
@@ -490,7 +522,7 @@ function showResult(){
     const t=tEnd-t0;
     $("cbig").textContent="登頂成功！";
     $("ct").textContent=(tries===1&&!hintSeen?"一発　":"")+fmt(t);
-    $("bar").innerHTML=`<b>登頂成功　${fmt(t)}</b>`;
+    $("barTxt").innerHTML=`<b>登頂成功　${fmt(t)}</b>`;
     confetti();
   }else{
     $("cbig").textContent="ちがう岩に着いた";
@@ -712,13 +744,13 @@ function stopFx(){FX.on=false;const cv=$("fx");if(cv&&!cv.hidden){cv.getContext(
 /* ---------- 進行 ---------- */
 function fmt(ms){const s=Math.floor(ms/1000);return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")}
 function hud(){$("time").textContent=fmt(tEnd?tEnd-t0:t0?performance.now()-t0:0)}
-function intro(){$("bar").innerHTML=LVS[LV].alpaca
+function intro(){$("barTxt").innerHTML=LVS[LV].alpaca
   ?`ヤギは<b>一番高いマス</b>へ跳ぶ。<b>アルパカは1段</b>しか登れない。それぞれ<b>別の旗</b>へ！`
   :`ヤギは上下左右で<b>一番高いマス</b>へ跳ぶ。それぞれ<b>別の旗</b>にたどり着けば成功！`}
 function syncHint(){$("hintBtn").setAttribute("aria-pressed",hintLvl>0)}
 function resetState(){if(T3.on)show3d(false);stopFx();lastMiss=new Set();SIM=null;tEnd=0;solved=false;$("clear").hidden=true;syncHint();intro();hud()}
 function newGame(){
-  setup();$("bar").textContent="岩山を作っています…";
+  setup();$("barTxt").textContent="岩山を作っています…";
   const L=LVS[LV],T0=performance.now();let best=null;
   const done=b=>{sol=b.h;rivers=b.rs;stepCons=rivers.flatMap(p=>p.slice(0,-1).map((u,k)=>({u,v:p[k+1]})));givens=b.g;
     val=[...Array(N*N)].map((_,i)=>givens.has(i)?sol[i]:0);memo=Array(N*N).fill(0);sel=0;hintLvl=0;hintSeen=false;tries=0;t0=0;layout();resetState();paint()};
@@ -736,7 +768,10 @@ function newGame(){
   };
   setTimeout(slice,20);
 }
-function retry(){val=[...Array(N*N)].map((_,i)=>givens.has(i)?sol[i]:0);memo=Array(N*N).fill(0);sel=0;tries=0;t0=0;resetState();paint()}
+/* 同じ問題をやり直すだけなので、時計も挑戦回数も引き継ぐ（0に戻るのは「新しい問題」のとき） */
+function retry(){const el=elapsed();
+  val=[...Array(N*N)].map((_,i)=>givens.has(i)?sol[i]:0);memo=Array(N*N).fill(0);sel=0;
+  resetState();t0=el?performance.now()-el:0;paint()}
 
 /* 盤の大きさを切り替えても、それぞれの問題を覚えておく */
 const STASH={};
@@ -751,7 +786,7 @@ function unstash(s){
 }
 function move(dr,dc){const r=(Math.floor(sel/N)+dr+N)%N,c=(sel%N+dc+N)%N;sel=r*N+c;paint()}
 function openSheet(){$("ruleN").textContent=N;$("ruleK").textContent="1〜"+N;
-  const a=!!LVS[LV].alpaca;$("ruleAlpaca").hidden=!a;$("ruleZero").hidden=!a;
+  $("ruleAlpaca").hidden=!LVS[LV].alpaca;
   $("sheet").hidden=false;$("sheetClose").focus()}
 function closeSheet(){$("sheet").hidden=true;grid.focus()}
 addEventListener("keydown",e=>{
@@ -776,7 +811,10 @@ $("rulesBtn").onclick=openSheet;$("sheetClose").onclick=closeSheet;$("sheet").on
 $("c-replay").onclick=replay;$("n-replay").onclick=replay;$("n-fix").onclick=()=>{$("clear").hidden=true;stopFx();show3d(false);paint()};
 $("view3d").onclick=()=>{$("clear").hidden=true;stopFx();if(T3.on){show3d(false);paint()}else if(solved)replay();else show3d(true)};
 $("retry").onclick=retry;
-let rt;addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{if(sol.length){layout();resize3d()}},120)});
+let rt;const relayout=()=>{clearTimeout(rt);rt=setTimeout(()=>{if(sol.length){layout();resize3d()}},120)};
+addEventListener("resize",relayout);addEventListener("orientationchange",relayout);
+if(window.visualViewport)visualViewport.addEventListener("resize",relayout);
+if(document.fonts)document.fonts.ready.then(relayout);   // 字が届くと道具の段数が変わり、盤に使える高さも変わる
 newGame();
 </script>
 
